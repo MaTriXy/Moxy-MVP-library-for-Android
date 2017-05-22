@@ -1,5 +1,11 @@
 package com.arellomobile.mvp.compiler;
 
+import com.arellomobile.mvp.GenerateViewState;
+import com.arellomobile.mvp.InjectViewState;
+import com.arellomobile.mvp.RegisterMoxyReflectorPackages;
+import com.arellomobile.mvp.presenter.InjectPresenter;
+import com.google.auto.service.AutoService;
+
 import java.io.IOException;
 import java.io.Writer;
 import java.lang.annotation.Annotation;
@@ -7,12 +13,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
-
-import com.arellomobile.mvp.GenerateViewState;
-import com.arellomobile.mvp.InjectViewState;
-import com.arellomobile.mvp.presenter.InjectPresenter;
-import com.google.auto.service.AutoService;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Messager;
@@ -44,15 +46,7 @@ public class MvpCompiler extends AbstractProcessor {
 	private static Messager sMessager;
 	private static Types sTypeUtils;
 	private static Elements sElementUtils;
-
-	@Override
-	public synchronized void init(ProcessingEnvironment processingEnv) {
-		super.init(processingEnv);
-
-		sMessager = processingEnv.getMessager();
-		sTypeUtils = processingEnv.getTypeUtils();
-		sElementUtils = processingEnv.getElementUtils();
-	}
+	private static Map<String, String> sOptions;
 
 	public static Messager getMessager() {
 		return sMessager;
@@ -67,9 +61,23 @@ public class MvpCompiler extends AbstractProcessor {
 	}
 
 	@Override
+	public synchronized void init(ProcessingEnvironment processingEnv) {
+		super.init(processingEnv);
+
+		sMessager = processingEnv.getMessager();
+		sTypeUtils = processingEnv.getTypeUtils();
+		sElementUtils = processingEnv.getElementUtils();
+		sOptions = processingEnv.getOptions();
+	}
+
+	@Override
 	public Set<String> getSupportedAnnotationTypes() {
 		Set<String> supportedAnnotationTypes = new HashSet<>();
-		Collections.addAll(supportedAnnotationTypes, InjectPresenter.class.getCanonicalName(), InjectViewState.class.getCanonicalName(), GenerateViewState.class.getCanonicalName());
+		Collections.addAll(supportedAnnotationTypes,
+				InjectPresenter.class.getCanonicalName(),
+				InjectViewState.class.getCanonicalName(),
+				RegisterMoxyReflectorPackages.class.getCanonicalName(),
+				GenerateViewState.class.getCanonicalName());
 		return supportedAnnotationTypes;
 	}
 
@@ -110,15 +118,44 @@ public class MvpCompiler extends AbstractProcessor {
 			generateCode(ElementKind.INTERFACE, viewStateClassGenerator, usedView);
 		}
 
-		String moxyReflector = MoxyReflectorGenerator.generate(viewStateProviderClassGenerator.getPresenterClassNames(), presenterBinderClassGenerator.getPresentersContainers(), viewStateClassGenerator.getStrategyClasses());
+		String moxyReflectorPackage = sOptions.get("moxyReflectorPackage");
+
+		if (moxyReflectorPackage == null) {
+			moxyReflectorPackage = "com.arellomobile.mvp";
+		}
+
+		List<String> additionalMoxyReflectorPackages = getAdditionalMoxyReflectorPackages(roundEnv);
+
+		String moxyReflector = MoxyReflectorGenerator.generate(
+				moxyReflectorPackage,
+				viewStateProviderClassGenerator.getPresenterClassNames(),
+				presenterBinderClassGenerator.getPresentersContainers(),
+				viewStateClassGenerator.getStrategyClasses(),
+				additionalMoxyReflectorPackages);
 
 		ClassGeneratingParams classGeneratingParams = new ClassGeneratingParams();
-		classGeneratingParams.setName("com.arellomobile.mvp.MoxyReflector");
+		classGeneratingParams.setName(moxyReflectorPackage + ".MoxyReflector");
 		classGeneratingParams.setBody(moxyReflector);
 
 		createSourceFile(classGeneratingParams);
 
 		return true;
+	}
+
+	private List<String> getAdditionalMoxyReflectorPackages(RoundEnvironment roundEnv) {
+		List<String> result = new ArrayList<>();
+
+		for (Element element : roundEnv.getElementsAnnotatedWith(RegisterMoxyReflectorPackages.class)) {
+			if (element.getKind() != ElementKind.CLASS) {
+				getMessager().printMessage(Diagnostic.Kind.ERROR, element + " must be " + ElementKind.CLASS.name() + ", or not mark it as @" + RegisterMoxyReflectorPackages.class.getSimpleName());
+			}
+
+			String[] packages = element.getAnnotation(RegisterMoxyReflectorPackages.class).value();
+
+			Collections.addAll(result, packages);
+		}
+
+		return result;
 	}
 
 

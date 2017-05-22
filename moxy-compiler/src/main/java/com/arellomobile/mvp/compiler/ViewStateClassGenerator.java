@@ -15,7 +15,6 @@ import com.arellomobile.mvp.viewstate.strategy.StateStrategyType;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.TypeParameterElement;
@@ -38,6 +37,7 @@ import static com.arellomobile.mvp.compiler.Util.fillGenerics;
 final class ViewStateClassGenerator extends ClassGenerator<TypeElement> {
 	public static final String STATE_STRATEGY_TYPE_ANNOTATION = StateStrategyType.class.getName();
 	public static final String DEFAULT_STATE_STRATEGY = AddToEndStrategy.class.getName() + ".class";
+	private static final String DEFAULT_STATE_STRATEGY_OPTION = "defaultStateStrategy";
 
 	private String mViewClassName;
 	private Set<String> mStrategyClasses;
@@ -50,7 +50,7 @@ final class ViewStateClassGenerator extends ClassGenerator<TypeElement> {
 		String generic = Util.getClassGenerics(typeElement);
 		String interfaceGeneric = "";
 		if (!typeElement.getTypeParameters().isEmpty()) {
-			interfaceGeneric = "<" + typeElement.getTypeParameters() + ">";
+			interfaceGeneric = "<" + join(",", typeElement.getTypeParameters()) + ">";
 		}
 
 		String fullClassName = Util.getFullClassName(typeElement);
@@ -58,7 +58,7 @@ final class ViewStateClassGenerator extends ClassGenerator<TypeElement> {
 		ClassGeneratingParams classGeneratingParams = new ClassGeneratingParams();
 		classGeneratingParams.setName(fullClassName + MvpProcessor.VIEW_STATE_SUFFIX);
 
-		mViewClassName = getClassName(typeElement);
+		mViewClassName = getClassName(typeElement) + interfaceGeneric;
 
 		String builder = "package " + fullClassName.substring(0, fullClassName.lastIndexOf(".")) + ";\n" +
 		                 "\n" +
@@ -71,17 +71,7 @@ final class ViewStateClassGenerator extends ClassGenerator<TypeElement> {
 		                 "import com.arellomobile.mvp.viewstate.strategy.AddToEndStrategy;\n" +
 		                 "import com.arellomobile.mvp.viewstate.strategy.StateStrategy;\n" +
 		                 "\n" +
-		                 "public class " + fullClassName.substring(fullClassName.lastIndexOf(".") + 1) + "$$State" + generic + " extends MvpViewState<" + mViewClassName + "> implements " + mViewClassName + interfaceGeneric + " {\n" +
-		                 "\tprivate ViewCommands<" + mViewClassName + "> mViewCommands = new ViewCommands<>();\n" +
-		                 "\n" +
-		                 "\t@Override\n" +
-		                 "\tpublic void restoreState(" + mViewClassName + " view, Set<ViewCommand<" + mViewClassName + ">> currentState) {\n" +
-		                 "\t\tif (mViewCommands.isEmpty()) {\n" +
-		                 "\t\t\treturn;\n" +
-		                 "\t\t}\n" +
-		                 "\n" +
-		                 "\t\tmViewCommands.reapply(view, currentState);\n" +
-		                 "\t}\n" +
+		                 "public class " + fullClassName.substring(fullClassName.lastIndexOf(".") + 1) + "$$State" + generic + " extends MvpViewState<" + mViewClassName + "> implements " + mViewClassName + " {\n" +
 		                 "\n";
 
 		List<Method> methods = new ArrayList<>();
@@ -164,7 +154,6 @@ final class ViewStateClassGenerator extends ClassGenerator<TypeElement> {
 			           "\t\t}\n" +
 			           "\n" +
 			           "\t\tfor(" + mViewClassName + " view : mViews) {\n" +
-			           "\t\t\tgetCurrentState(view).add(" + commandFieldName + ");\n" +
 			           "\t\t\tview." + method.name + "(" + argumentsString + ");\n" +
 			           "\t\t}\n" +
 			           "\n" +
@@ -235,7 +224,7 @@ final class ViewStateClassGenerator extends ClassGenerator<TypeElement> {
 				MvpCompiler.getMessager().printMessage(Diagnostic.Kind.ERROR, "You are trying generate ViewState for " + typeElement.getSimpleName() + ". But " + typeElement.getSimpleName() + " contains non-void method \"" + methodElement.getSimpleName() + "\" that return type is " + methodElement.getReturnType() + ". See more here: https://github.com/Arello-Mobile/Moxy/issues/2");
 			}
 
-			String strategyClass = defaultStrategy != null ? defaultStrategy : DEFAULT_STATE_STRATEGY;
+			String strategyClass = defaultStrategy != null ? defaultStrategy : getDefaultStateStrategy();
 			String methodTag = "\"" + methodElement.getSimpleName() + "\"";
 			for (AnnotationMirror annotationMirror : methodElement.getAnnotationMirrors()) {
 				if (!annotationMirror.getAnnotationType().asElement().toString().equals(STATE_STRATEGY_TYPE_ANNOTATION)) {
@@ -296,7 +285,7 @@ final class ViewStateClassGenerator extends ClassGenerator<TypeElement> {
 
 			List<Argument> arguments = new ArrayList<>();
 			for (VariableElement parameter : parameters) {
-				arguments.add(new Argument(fillGenerics(methodTypes, parameter.asType()), parameter.toString()));
+				arguments.add(new Argument(fillGenerics(methodTypes, parameter.asType()), parameter.toString(), parameter.getAnnotationMirrors()));
 			}
 
 			List<String> throwTypes = new ArrayList<>();
@@ -332,15 +321,7 @@ final class ViewStateClassGenerator extends ClassGenerator<TypeElement> {
 	}
 
 	private String getClassName(TypeElement typeElement) {
-		String name = typeElement.getSimpleName().toString();
-
-		Element enclosingElement = typeElement.getEnclosingElement();
-		while (enclosingElement != null && enclosingElement.getKind() == ElementKind.CLASS) {
-			name = enclosingElement.getSimpleName() + "." + name;
-			enclosingElement = enclosingElement.getEnclosingElement();
-		}
-
-		return name;
+		return typeElement.getQualifiedName().toString();
 	}
 
 	private String generateLocalViewCommand(String viewClassName, String builder, List<Method> methods) {
@@ -374,11 +355,14 @@ final class ViewStateClassGenerator extends ClassGenerator<TypeElement> {
 			           "\t\t@Override\n" +
 			           "\t\tpublic void apply(" + viewClassName + " mvpView) {\n" +
 			           "\t\t\tmvpView." + method.name + "(" + argumentsString + ");\n" +
-			           "\t\t\tgetCurrentState(mvpView).add(this);\n" +
 			           "\t\t}\n" +
 			           "\t}\n";
 		}
 		return builder;
+	}
+
+	private String getDefaultStateStrategy() {
+		return DEFAULT_STATE_STRATEGY;
 	}
 
 	public String getStateStrategyType(TypeElement typeElement) {
@@ -456,15 +440,17 @@ final class ViewStateClassGenerator extends ClassGenerator<TypeElement> {
 	private static class Argument {
 		String type;
 		String name;
+		List<? extends AnnotationMirror> annotations;
 
-		public Argument(String type, String name) {
+		public Argument(String type, String name, List<? extends AnnotationMirror> annotations) {
 			this.type = type;
 			this.name = name;
+			this.annotations = annotations;
 		}
 
 		@Override
 		public String toString() {
-			return type + " " + name;
+			return join(" ", annotations) + " " + type + " " + name;
 		}
 
 		@Override
