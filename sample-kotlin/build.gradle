@@ -14,7 +14,7 @@ apply plugin: 'kotlin-android'
 
 android {
     compileSdkVersion 25
-    buildToolsVersion "25.0.0"
+    buildToolsVersion '26.0.2'
 
     defaultConfig {
         applicationId "com.arellomobile.mvp.sample.kotlin"
@@ -40,9 +40,9 @@ android {
 dependencies {
     compile 'com.android.support:appcompat-v7:25.0.0'
 
-    compile 'com.arello-mobile:moxy:1.4.5'
-    compile 'com.arello-mobile:moxy-app-compat:1.4.5'
-    kapt 'com.arello-mobile:moxy-compiler:1.4.5'
+    compile 'com.arello-mobile:moxy:1.5.3'
+    compile 'com.arello-mobile:moxy-app-compat:1.5.3'
+    kapt 'com.arello-mobile:moxy-compiler:1.5.3'
 
     compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 }

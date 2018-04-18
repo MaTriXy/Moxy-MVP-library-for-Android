@@ -15,8 +15,8 @@ import com.arellomobile.mvp.viewstate.strategy.StateStrategyType;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.element.VariableElement;
@@ -25,6 +25,7 @@ import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import javax.tools.Diagnostic;
+
 
 import static com.arellomobile.mvp.compiler.Util.fillGenerics;
 
@@ -72,16 +73,6 @@ final class ViewStateClassGenerator extends ClassGenerator<TypeElement> {
 		                 "import com.arellomobile.mvp.viewstate.strategy.StateStrategy;\n" +
 		                 "\n" +
 		                 "public class " + fullClassName.substring(fullClassName.lastIndexOf(".") + 1) + "$$State" + generic + " extends MvpViewState<" + mViewClassName + "> implements " + mViewClassName + " {\n" +
-		                 "\tprivate ViewCommands<" + mViewClassName + "> mViewCommands = new ViewCommands<>();\n" +
-		                 "\n" +
-		                 "\t@Override\n" +
-		                 "\tpublic void restoreState(" + mViewClassName + " view, Set<ViewCommand<" + mViewClassName + ">> currentState) {\n" +
-		                 "\t\tif (mViewCommands.isEmpty()) {\n" +
-		                 "\t\t\treturn;\n" +
-		                 "\t\t}\n" +
-		                 "\n" +
-		                 "\t\tmViewCommands.reapply(view, currentState);\n" +
-		                 "\t}\n" +
 		                 "\n";
 
 		List<Method> methods = new ArrayList<>();
@@ -164,7 +155,6 @@ final class ViewStateClassGenerator extends ClassGenerator<TypeElement> {
 			           "\t\t}\n" +
 			           "\n" +
 			           "\t\tfor(" + mViewClassName + " view : mViews) {\n" +
-			           "\t\t\tgetCurrentState(view).add(" + commandFieldName + ");\n" +
 			           "\t\t\tview." + method.name + "(" + argumentsString + ");\n" +
 			           "\t\t}\n" +
 			           "\n" +
@@ -231,6 +221,10 @@ final class ViewStateClassGenerator extends ClassGenerator<TypeElement> {
 
 			final ExecutableElement methodElement = (ExecutableElement) element;
 
+			if (methodElement.getModifiers().contains(Modifier.STATIC)) {
+				continue;
+			}
+
 			if (!methodElement.getReturnType().toString().equals("void")) {
 				MvpCompiler.getMessager().printMessage(Diagnostic.Kind.ERROR, "You are trying generate ViewState for " + typeElement.getSimpleName() + ". But " + typeElement.getSimpleName() + " contains non-void method \"" + methodElement.getSimpleName() + "\" that return type is " + methodElement.getReturnType() + ". See more here: https://github.com/Arello-Mobile/Moxy/issues/2");
 			}
@@ -296,7 +290,7 @@ final class ViewStateClassGenerator extends ClassGenerator<TypeElement> {
 
 			List<Argument> arguments = new ArrayList<>();
 			for (VariableElement parameter : parameters) {
-				arguments.add(new Argument(fillGenerics(methodTypes, parameter.asType()), parameter.toString()));
+				arguments.add(new Argument(fillGenerics(methodTypes, parameter.asType()), parameter.toString(), parameter.getAnnotationMirrors()));
 			}
 
 			List<String> throwTypes = new ArrayList<>();
@@ -366,7 +360,6 @@ final class ViewStateClassGenerator extends ClassGenerator<TypeElement> {
 			           "\t\t@Override\n" +
 			           "\t\tpublic void apply(" + viewClassName + " mvpView) {\n" +
 			           "\t\t\tmvpView." + method.name + "(" + argumentsString + ");\n" +
-			           "\t\t\tgetCurrentState(mvpView).add(this);\n" +
 			           "\t\t}\n" +
 			           "\t}\n";
 		}
@@ -452,15 +445,17 @@ final class ViewStateClassGenerator extends ClassGenerator<TypeElement> {
 	private static class Argument {
 		String type;
 		String name;
+		List<? extends AnnotationMirror> annotations;
 
-		public Argument(String type, String name) {
+		public Argument(String type, String name, List<? extends AnnotationMirror> annotations) {
 			this.type = type;
 			this.name = name;
+			this.annotations = annotations;
 		}
 
 		@Override
 		public String toString() {
-			return type + " " + name;
+			return join(" ", annotations) + " " + type + " " + name;
 		}
 
 		@Override
