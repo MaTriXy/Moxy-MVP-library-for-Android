@@ -1,4 +1,14 @@
 # Moxy
+
+**<span style="color:red">
+This Moxy repository is deprecated and no longer supported. 
+</span>**
+
+**Please migrate to the actual version of the Moxy framework at [Moxy communuty](https://github.com/moxy-community/Moxy) repo.**
+
+## Description
+
+
 [![Maven Central](https://img.shields.io/maven-central/v/com.arello-mobile/moxy.svg)](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22com.arello-mobile%22%20AND%20(a%3A%22moxy%22%20OR%20a%3A%22moxy-compiler%22%20OR%20a%3A%22moxy-android%22%20OR%20a%3A%22moxy-app-compat%22)) [![license](https://img.shields.io/github/license/mashape/apistatus.svg)](https://opensource.org/licenses/MIT)
 
 Moxy is a library that helps to use MVP pattern when you do the Android Application. _Without problems of lifecycle and boilerplate code!_
@@ -76,33 +86,46 @@ Base modules integration:
 ```groovy
 dependencies {
   ...
-  compile 'com.arello-mobile:moxy:1.5.3'
-  annotationProcessor 'com.arello-mobile:moxy-compiler:1.5.3'
+  compile 'com.arello-mobile:moxy:1.5.5'
+  annotationProcessor 'com.arello-mobile:moxy-compiler:1.5.5'
 }
 ```
 For additional base view classes `MvpActivity` and `MvpFragment` add this:
 ```groovy
 dependencies {
   ...
-  compile 'com.arello-mobile:moxy-android:1.5.3'
+  compile 'com.arello-mobile:moxy-android:1.5.5'
 }
 ```
 If you are planning to use AppCompat, then you can use `MvpAppCompatActivity` and `MvpAppCompatFragment`. Then add this:
 ```groovy
 dependencies {
   ...
-  compile 'com.arello-mobile:moxy-app-compat:1.5.3'
+  compile 'com.arello-mobile:moxy-app-compat:1.5.5'
   compile 'com.android.support:appcompat-v7:$support_version'
 }
 ```
+### AndroidX module integration
+If you use AndroidX, use `MvpAppCompatActivity` and `MvpAppCompatFragment` add this (thanks to [@jordan1997](https://github.com/jordan1997)):
+```groovy
+implementation 'tech.schoolhelper:moxy-x-androidx:1.7.0'
+```
+### AndroidX(Google material) module integration
+If you use google material, use `MvpBottomSheetDialogFragment` add this (thanks to [@jordan1997](https://github.com/jordan1997)):
+```groovy
+implementation 'tech.schoolhelper:moxy-x-material:1.7.0'
+```
+
+Note: [@jordan1997](https://github.com/jordan1997) creates [fork](https://github.com/schoolhelper/MoxyX) of Moxy — feel free to use it fully (instead of use only this module dependency) on your opinion.
+
 ### Kotlin
-If you are using kotlin, use `kapt` instead of `provided`/`apt` dependency type and add `kotlin-kapt` plugin:
+If you are using kotlin, use `kapt` instead of `provided`/`apt` dependency type:
 ```groovy
 apply plugin: 'kotlin-kapt'
 
 dependencies {
   ...
-  kapt 'com.arello-mobile:moxy-compiler:1.5.3'
+  kapt 'com.arello-mobile:moxy-compiler:1.5.5'
 }
 ```
 
